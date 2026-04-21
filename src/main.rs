@@ -303,7 +303,7 @@ fn print_info(song: &it::Song, project_name: &str) {
         println!("\nSamples:");
         for (i, samp) in song.samples.iter().enumerate() {
             println!(
-                "  {:>3}  {:26}  len={:>7}  loop={} ({}-{}){}  {}Hz  {}bit{}",
+                "  {:>3}  {:26}  len={:>7}  loop={} ({}-{}){}  {}Hz  {}bit{}  flags=0x{:02X}  cvt=0x{:02X}  compressed={}",
                 i + 1,
                 samp.display_name(),
                 samp.length,
@@ -313,7 +313,10 @@ fn print_info(song: &it::Song, project_name: &str) {
                 if samp.pingpong { " pp" } else { "   " },
                 samp.c5_speed,
                 if samp.bits16 { 16 } else { 8 },
-                if samp.stereo { " stereo" } else { "" }
+                if samp.stereo { " stereo" } else { "" },
+                samp.flags,
+                samp.convert_flags,
+                samp.compressed,
             );
         }
     }
