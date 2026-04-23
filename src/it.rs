@@ -270,7 +270,9 @@ impl Sample {
                 decompress_compressed_8bit(data, ptr, self.length as usize, self.stereo, is_it215)
             }
         } else {
-            extract_raw_pcm(data, ptr, self.length as usize, self.bits16, self.stereo)
+            // Bit 0 of convert_flags: 1 = signed storage, 0 = unsigned storage.
+            let signed_samples = self.convert_flags & 0x01 != 0;
+            extract_raw_pcm(data, ptr, self.length as usize, self.bits16, self.stereo, signed_samples)
         }
     }
 }
@@ -524,6 +526,7 @@ fn extract_raw_pcm(
     length: usize,
     bits16: bool,
     stereo: bool,
+    signed_samples: bool,
 ) -> Result<Vec<i16>> {
     let channels = if stereo { 2 } else { 1 };
     let total_samples = length * channels;
@@ -535,7 +538,13 @@ fn extract_raw_pcm(
         for i in 0..total_samples {
             let b0 = data[ptr + i * 2];
             let b1 = data[ptr + i * 2 + 1];
-            out.push(i16::from_le_bytes([b0, b1]));
+            let s = if signed_samples {
+                i16::from_le_bytes([b0, b1])
+            } else {
+                // Unsigned 16-bit: shift range from 0..65535 to -32768..32767
+                (u16::from_le_bytes([b0, b1]) as i32 - 32768) as i16
+            };
+            out.push(s);
         }
         Ok(out)
     } else {
@@ -543,10 +552,15 @@ fn extract_raw_pcm(
         ensure!(ptr + byte_len <= data.len(), "raw 8-bit sample data out of range");
         let mut out = Vec::with_capacity(total_samples);
         for i in 0..total_samples {
-            // IT 8-bit samples are unsigned; convert to signed i16.
             let byte = data[ptr + i];
-            let signed = (byte as i16) - 128;
-            out.push(signed * 256);
+            let s: i16 = if signed_samples {
+                // Signed 8-bit: direct cast then scale to 16-bit range
+                (byte as i8 as i16) * 256
+            } else {
+                // Unsigned 8-bit: shift range from 0..255 to -128..127, then scale
+                ((byte as i16) - 128) * 256
+            };
+            out.push(s);
         }
         Ok(out)
     }
