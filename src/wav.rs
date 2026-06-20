@@ -37,6 +37,12 @@ pub fn write_wav<W: Write>(
     let last_frame = num_frames.saturating_sub(1);
 
     // Build atem JSON -------------------------------------------------------
+    // When a loop is active, the slice End doubles as the loop-end boundary.
+    // IT stores loop_end as exclusive; convert to inclusive for MPC.
+    let slice_end = loop_info
+        .filter(|l| l.active)
+        .map(|l| l.end.saturating_sub(1))
+        .unwrap_or(last_frame);
     let loop_start = loop_info.filter(|l| l.active).map(|l| l.start).unwrap_or(0);
     let loop_mode: u32 = match loop_info {
         Some(l) if l.active && l.pingpong => 2,
@@ -68,7 +74,7 @@ pub fn write_wav<W: Write>(
         \x20       \"scale\": \"Major\"\n\
         \x20   }}\n\
         }}",
-        last_frame, loop_start, loop_mode
+        slice_end, loop_start, loop_mode
     );
 
     // MPC's RIFF parser doesn't skip the padding byte on odd-size chunks, so
